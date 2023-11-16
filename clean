@@ -1,0 +1,2 @@
+rm -f init-result.txt
+rm -Rf mysetup 
