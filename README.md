@@ -1,4 +1,4 @@
-Assumption
+### Assumption
 
 1. This test based on KIND (Kubernetes in Docker)
 2. Port 443 / Node 1 published to TCP/30443 on host
@@ -6,7 +6,7 @@ Assumption
 4. HashiCorp Vault is already installed in a namespace called "vault" and unsealed in Kubernetes Cluster.
 5. certbot is already installed.
 
-
+### Step by Step
 1. Generate and Export Non-expired ServiceAccount Token for Hashicorp Vault's Kubernetes Authentication Method 
 
 ```
