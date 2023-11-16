@@ -1,0 +1,25 @@
+global:
+  enabled: true
+  enableAutoEncrypt: true
+  datacenter: dc1
+  gossipEncryption:
+    secretName: consul-gossip-key
+    secretKey: key
+  tls:
+    enabled: true
+    caCert:
+      secretName: "tls-ca"
+    caKey:
+      secretName: "tls-ca"
+    
+
+client:
+  enabled: true
+
+server:
+  serverCert:
+    secretName: "tls-consul"
+  replicas: 3
+  bootstrapExpect: 3
+  disruptionBudget:
+    maxUnavailable: 0

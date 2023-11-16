@@ -1,0 +1,90 @@
+ 
+kind delete cluster --name mycluster
+docker rm -f nfs
+rm -Rf nfs
+
+
+kind create cluster --config ./config/kind-config
+
+
+kubectl get nodes
+echo
+read -p "Cluster Ready !!!" OK
+echo "-- Create NFS Server"
+for i in {1..10}; do mkdir -p nfs/student0/storage$i; done
+docker run -d --network kind --name nfs --privileged -v $(pwd)/nfs:/data -e SHARED_DIRECTORY=/data -e PERMITTED="0.0.0.0/0" damrongsak/nfs-server
+
+
+
+echo "-- Create All Key Pair for Vault and Consul"
+kubectl apply -f ./config/pv.yaml
+
+kubectl create ns vault
+kubectl -n vault create secret generic consul-gossip-key --from-literal=key='UXtObIAKDo7gfV07++izEB8Va7pBsG5YkzS5LaqNTlg='
+kubectl -n vault create secret tls tls-server --cert ./pki/server1.crt --key ./pki/server1.key
+kubectl -n vault create secret tls tls-ca --cert ./pki/ca.crt --key ./pki/ca.key
+kubectl -n vault create secret tls tls-consul --cert ./pki/consul.crt --key ./pki/consul.key
+kubectl -n vault create secret tls  client-tls-init  --cert ./pki/consul.crt --key ./pki/consul.key
+kubectl -n vault create secret tls consul-consul-connect-inject-webhook-cert --cert ./pki/consul.crt --key ./pki/consul.key
+
+echo "-- Installing Consul"
+echo
+helm install consul hashicorp/consul --create-namespace --namespace vault -f ./config/consul-vaules.yaml
+echo
+while true
+do
+  ALLREADY=$(./tools/counter-notready.sh)
+  if [ $ALLREADY -gt  0 ]
+  then
+     echo "#" | tr -d '\n'
+     sleep 1
+  else
+     echo
+     break
+  fi
+done
+
+
+echo "-- Installing Vault"
+
+helm install vault hashicorp/vault --values ./config/vault-values.yaml --namespace vault
+echo
+while true
+do
+  ALLREADY=$(./tools/counter-notready.sh)
+  ALLRUNNING=$(./tools/counter-running.sh)
+  if [ $ALLREADY -eq 3 ] && [ $ALLRUNNING -eq 12 ]
+  then
+     echo
+     break
+  else
+     echo "#" | tr -d '\n'
+     sleep 1
+  fi
+done
+
+
+
+rm -f init-result.txt
+kubectl exec --stdin=true --tty=true -n vault  vault-0 -- vault operator init > init-result.txt
+
+cat init-result.txt | grep "Key 1" |awk '{print "kubectl exec -it -n vault vault-0 -- vault operator unseal "$4}' | sed -r "s/\x1B\[[0-9;]*[a-zA-Z]//g" | sh
+cat init-result.txt | grep "Key 2" |awk '{print "kubectl exec -it -n vault vault-0 -- vault operator unseal "$4}' | sed -r "s/\x1B\[[0-9;]*[a-zA-Z]//g" | sh
+cat init-result.txt | grep "Key 3" |awk '{print "kubectl exec -it -n vault vault-0 -- vault operator unseal "$4}' | sed -r "s/\x1B\[[0-9;]*[a-zA-Z]//g" | sh
+
+
+cat init-result.txt | grep "Key 1" |awk '{print "kubectl exec -it -n vault vault-1 -- vault operator unseal "$4}' | sed -r "s/\x1B\[[0-9;]*[a-zA-Z]//g" | sh
+cat init-result.txt | grep "Key 2" |awk '{print "kubectl exec -it -n vault vault-1 -- vault operator unseal "$4}' | sed -r "s/\x1B\[[0-9;]*[a-zA-Z]//g" | sh
+cat init-result.txt | grep "Key 3" |awk '{print "kubectl exec -it -n vault vault-1 -- vault operator unseal "$4}' | sed -r "s/\x1B\[[0-9;]*[a-zA-Z]//g" | sh
+
+
+cat init-result.txt | grep "Key 1" |awk '{print "kubectl exec -it -n vault vault-2 -- vault operator unseal "$4}' | sed -r "s/\x1B\[[0-9;]*[a-zA-Z]//g" | sh
+cat init-result.txt | grep "Key 2" |awk '{print "kubectl exec -it -n vault vault-2 -- vault operator unseal "$4}' | sed -r "s/\x1B\[[0-9;]*[a-zA-Z]//g" | sh
+cat init-result.txt | grep "Key 3" |awk '{print "kubectl exec -it -n vault vault-2 -- vault operator unseal "$4}' | sed -r "s/\x1B\[[0-9;]*[a-zA-Z]//g" | sh
+
+
+kubectl apply -f ./config/vault-svc.yaml
+sleep 10
+source .vaultrc
+vault status
+

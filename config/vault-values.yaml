@@ -1,0 +1,43 @@
+global:
+  enabled: true
+  tlsDisable: false
+
+server:
+  logLevel: "debug"
+  extraEnvironmentVars:
+    VAULT_CACERT: /vault/userconfig/tls-ca/tls.crt
+  extraVolumes:
+    - type: secret
+      name: tls-server
+    - type: secret
+      name: tls-ca
+  ha:
+    enabled: true
+    replicas: 3
+    config: |
+        ui = true
+        listener "tcp" {
+          tls_disable = 0
+          address = "0.0.0.0:8200"
+          tls_cert_file = "/vault/userconfig/tls-server/tls.crt"
+          tls_key_file = "/vault/userconfig/tls-server/tls.key"
+          tls_ca_file = "/vault/userconfig/tls-ca/tls.crt"
+        }
+        storage "consul" {
+          path = "vault"
+          address = "consul-consul-server:8501"
+          scheme = "https"         
+          tls_ca_file = "/vault/userconfig/tls-ca/tls.crt"
+        }
+    ui: 
+      enabled: true
+      serviceType: "NodePort"
+      serviceNodePort: 30000
+    service:
+      enabled: true
+      active:
+        enabled: true
+      type: NodePort
+      nodePort: 30001
+injector:
+  logLevel: "debug"

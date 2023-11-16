@@ -1,0 +1,11 @@
+#!/bin/bash
+
+cat > ca-mtls.yaml  <<EOF
+kind: Secret
+metadata:
+  name: ca-mtls-secret
+apiVersion: v1
+type: nginx.org/ca
+data:
+  ca.crt: $(cat int.crt | base64)
+EOF
